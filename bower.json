@@ -13,17 +13,17 @@
   ],
   "dependencies": {
     "scalejs": "lisovin/scalejs",
-    "history": "~1.8.0"
+    "history": "~1.8.0",
+    "scalejs.statechart-scion": "EikosPartners/scalejs.statechart-scion"
   },
   "devDependencies": {
     "requirejs": "latest",
     "scalejs.functional": "lisovin/scalejs.functional#~0.4.0",
-    "scalejs.statechart-scion": "lisovin/scalejs.statechart-scion#dev",
     "rxjs": "~2.3.11"
   },
   "overrides": {
-      "history": {
-          "main": "scripts/bundled-uncompressed/html5/native.history.js"
-      }
+    "history": {
+      "main": "scripts/bundled-uncompressed/html5/native.history.js"
+    }
   }
 }

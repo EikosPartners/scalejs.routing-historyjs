@@ -7,7 +7,13 @@ module.exports = ( grunt ) ->
         options:
             baseUrl: 'src'
             include: '<%=package.name%>'
-            exclude: ['scalejs', 'history']
+            exclude: ['scalejs', 'history', 'linqjs', 'requirejs', 'rx.all',
+                'rx.all.compat', 'rx', 'rx.compat', 'rx.aggregates', 'rx.async',
+                'rx.async.compat', 'rx.backpressure', 'rx.binding',
+                'rx.coincidence', 'rx.experimental', 'rx.lite',
+                'rx.lite.compat', 'rx.joinpatterns', 'rx.testing', 'rx.time',
+                'rx.virtualtime', 'scalejs.functional',
+                'scalejs.statechart-scion', 'scalejs.linq-linqjs', 'scion-ng']
             mainConfigFile: 'rjsconfig.js'
             out: 'build/<%=package.name%>.js'
             optimize: 'none'
