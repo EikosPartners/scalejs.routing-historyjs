@@ -20,6 +20,7 @@
     "jshint-stylish": "^0.4.0",
     "load-grunt-config": "~0.13.1",
     "rjs-build-analysis": "0.0.3",
+    "rjs-extender": "git://github.com/EikosPartners/rjs-extender",
     "scalejs.statechart-scion": "git://github.com/lisovin/scalejs.statechart-scion#dev",
     "time-grunt": "~1.0.0"
   }

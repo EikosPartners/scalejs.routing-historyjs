@@ -2,11 +2,10 @@
 define([
     'scalejs!core',
     'history',
-    'rx'
+    'scalejs.reactive'
 ], function (
     core,
-    History,
-    rx
+    History
 ) {
     'use strict';
 
@@ -23,11 +22,11 @@ define([
     }
 
     function observe() {
-        var observable = rx.Observable,
-            disposable = rx.Disposable;
+        var observable = core.reactive.Observable,
+            disposable = core.reactive.Disposable;
 
         return observable.createWithDisposable(function (observer) {
-            History.Adapter.bind(window, 'statechange', function () {
+            var subId = History.Adapter.bind(window, 'statechange', function () {
                 observer.onNext(get());
             });
 

@@ -12,7 +12,7 @@ module.exports = ( grunt ) ->
                 'rx.async.compat', 'rx.backpressure', 'rx.binding',
                 'rx.coincidence', 'rx.experimental', 'rx.lite',
                 'rx.lite.compat', 'rx.joinpatterns', 'rx.testing', 'rx.time',
-                'rx.virtualtime', 'scalejs.functional',
+                'rx.virtualtime', 'scalejs.functional', 'scalejs.reactive'
                 'scalejs.statechart-scion', 'scalejs.linq-linqjs', 'scion-ng']
             mainConfigFile: 'rjsconfig.js'
             out: 'build/<%=package.name%>.js'

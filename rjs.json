@@ -1,0 +1,10 @@
+{
+    "paths": {
+        "history": "../bower_components/history/scripts/bundled-uncompressed/html5/native.history"
+    },
+    "shim": {
+        "history": {
+            "exports": "History"
+        }
+    }
+}
