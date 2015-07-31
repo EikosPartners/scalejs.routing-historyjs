@@ -30,7 +30,7 @@ var require = {
     'scalejs.functional': '../bower_components/scalejs.functional/dist/scalejs.functional.min',
     'scalejs.statechart-scion': '../bower_components/scalejs.statechart-scion/dist/scalejs.statechart-scion.min',
     'scalejs.linq-linqjs': '../bower_components/scalejs.linq-linqjs/dist/scalejs.linq-linqjs.min',
-    'scion-ng': '../bower_components/scion-ng/lib/scion',
+    'scion-ng': 'empty:',
     history: '../bower_components/history/scripts/bundled-uncompressed/html5/native.history',
     'rjs-extender': '../bower_components/rjs-extender/extender',
     'scalejs.reactive': '../bower_components/scalejs.reactive/dist/scalejs.reactive.min'

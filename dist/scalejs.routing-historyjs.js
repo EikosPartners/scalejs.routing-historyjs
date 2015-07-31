@@ -2,11 +2,10 @@
 define('scalejs.routing-historyjs/history',[
     'scalejs!core',
     'history',
-    'rx'
+    'scalejs.reactive'
 ], function (
     core,
-    History,
-    rx
+    History
 ) {
     'use strict';
 
@@ -23,11 +22,11 @@ define('scalejs.routing-historyjs/history',[
     }
 
     function observe() {
-        var observable = rx.Observable,
-            disposable = rx.Disposable;
+        var observable = core.reactive.Observable,
+            disposable = core.reactive.Disposable;
 
         return observable.createWithDisposable(function (observer) {
-            History.Adapter.bind(window, 'statechange', function () {
+            var subId = History.Adapter.bind(window, 'statechange', function () {
                 observer.onNext(get());
             });
 
@@ -47,186 +46,22 @@ define('scalejs.routing-historyjs/history',[
 });
 
 
-/*global define*/
-define('scalejs.routing-historyjs/routeMapper',[
-    'scalejs!core'
-], function (
-    core
-) {
-    'use strict';
-
-    var clone = core.object.clone;
-
-    /*
-     * Given a mapping /a/{id}
-     *   fromUrl('/a/1?x=2&y=t') will return { id: 1, x: 1, y: 't'}
-     *   toUrl({id : 1, x: 1, y: 't'}) will return '/a/1?x=2&y=t'
-     */
-    return function routeMapper(mapping) {
-        var cleanedMapping,
-            routeGroups = [],
-            mappingRegex;
-
-        function createMappingRegex() {
-            var routeGroupsMatches,
-                mappingRegexText;
-
-            cleanedMapping = mapping.replace(/^\/*|[/?]*$/g, ''); // strip leading '/' and ending '/' and '?'
-
-            routeGroupsMatches = cleanedMapping.match(/{([^}])*}/g);
-            if (routeGroupsMatches) {
-                routeGroups = routeGroupsMatches.map(function (m) {
-                    return m.replace(/[{}]/g, '');
-                });
-            }
-
-            mappingRegexText = '^[/]*' + cleanedMapping.replace(/{[^}]*}/g, '(.+?)') + '[?/]*$';
-
-            mappingRegex = new RegExp(mappingRegexText);
-        }
-
-        function fromUrl(url) {
-            var urlElements,
-                path,
-                query,
-                matches,
-                result = {};
-
-            urlElements = url.split(/\/*\?/);
-            path = urlElements[0];
-            query = url.substring(path.length).replace(/^[?/]*/, '');
-
-            matches = path.match(mappingRegex);
-
-            if (matches === null) {
-                return null;
-            }
-
-            matches.shift(); // get rid of 0th group that matches whole string
-            matches.forEach(function (m, i) {
-                result[routeGroups[i]] = m;
-            });
-
-            query.split('&').map(function (kv) {
-                var parts = kv.split('='),
-                    key = parts[0],
-                    value = parts[1];
-
-                if (key) {
-                    result[key] = value;
-                }
-            });
-
-            return result;
-        }
-
-        function toUrl(data) {
-            data = data ? clone(data) : {};
-
-            var path,
-                query = {};
-
-            path = routeGroups.reduce(function (path, g) {
-                var p = path.replace('{' + g + '}', data[g]);
-                delete data[g];
-                return p;
-            }, cleanedMapping);
-
-            query = Object.keys(data)
-                .map(function (key) {
-                    return key + '=' + data[key];
-                })
-                .join('&');
-
-            return '/' + path + (query ? '?' + query : '');
-        }
-
-        createMappingRegex();
-
-        return {
-            fromUrl: fromUrl,
-            toUrl: toUrl
-        };
-    };
-});
-/*ignore jslint end*/
-;
-/*global define,window,document,console*/
-/*jslint todo:true*/
-define('scalejs.routing-historyjs/router',[
-    //'scalejs!core',
-    './routeMapper'
-], function (
-    //core,
-    routeMapper
-) {
-    'use strict';
-
-    var routes = {},
-        baseUrl = '';
-
-    function addRoute(routeName, route) {
-        var mapper = routeMapper(route);
-        routes[routeName] = mapper;
-    }
-
-    function tryFromUrl(routeName, url) {
-        var mapper,
-            parsed;
-
-        if (url.indexOf(baseUrl) < 0) { return; }
-
-        url = url.substring(baseUrl.length);
-
-        mapper = routes[routeName];
-        if (mapper) {
-            parsed = mapper.fromUrl(url);
-            return parsed;
-        }
-    }
-
-    function tryToUrl(routeName, data) {
-        var mapper,
-            url;
-
-        mapper = routes[routeName];
-        if (mapper) {
-            url = mapper.toUrl(data);
-            return baseUrl + url;
-        }
-    }
-
-    function setBaseUrl(newBaseUrl) {
-        baseUrl = newBaseUrl || '';
-        baseUrl = baseUrl.replace(/\/*$/, '');
-    }
-
-    return {
-        addRoute: addRoute,
-        tryToUrl: tryToUrl,
-        tryFromUrl: tryFromUrl,
-        setBaseUrl: setBaseUrl
-    };
-});
-
 /*global define,window,document*/
 /*jslint todo:true*/
 define('scalejs.routing-historyjs/routing',[
     'scalejs!core',
     './history',
-    './router',
-    'rx',
-    'scalejs.statechart-scion'
+    'scalejs.statechart-scion',
+    'scalejs.reactive'
 ], function (
     core,
-    history,
-    router,
-    rx
+    history
 ) {
     'use strict';
 
     var has = core.object.has,
-        extend = core.object.extend,
+        is = core.type.is,
+        merge = core.object.merge,
         toArray = core.array.toArray,
         on = core.state.builder.on,
         gotoInternally = core.state.builder.gotoInternally,
@@ -236,75 +71,88 @@ define('scalejs.routing-historyjs/routing',[
         $yield = core.functional.builder.$yield,
         registerTransition = core.state.registerTransition,
         observeState = core.state.observe,
-        // properties
-        routerStateId,
+        routedStates = {},
         routerTransitions = [],
-        disposable = new rx.CompositeDisposable(),
-        firstNavigation = true;
+        first = true,
+        baseUrl,
+        routerStateId;
 
-    function navigate(url) {
-        if (firstNavigation) {
-            firstNavigation = false;
-            history.replace({ url: url });
-        } else {
-            history.add({ url: url });
+    function observeHistory() {
+        return history
+            .observe()
+            .select(convertHistoryEventToNavigatonEvent);
+    }
+
+    function isBlank(url) {
+        return url === '/' || url === '?' || url === '';
+    }
+
+    function serialize(data) {
+        var url = '?' + data.path.join('/');
+
+        if (has(data.parameters)) {
+            url += '?' + Object.keys(data.parameters).map(function (k) {
+                return k + '=' + data.parameters[k];
+            }).join('&');
         }
+
+        return url;
     }
 
-    function setupRouting() {
-        var currentUrl;
+    function deserialize(u) {
+        var url = u.replace('/?', ''),
+            data = isBlank(url) ? [['']] : url.split('?')
+                .filter(function (p) { return p !== ''; })
+                .map(function (d, i) {
+                    if (i === 0) {
+                        return d.split('/');
+                    }
+                    return d.split('&');
+                });
 
-        disposable.add(observeState().subscribe(function (e) {
-            var url;
-
-            // do routing on state entry
-            if (e.event !== 'entry') { return; }
-
-            // try map data to url with the router
-            url = router.tryToUrl(e.state, e.currentEvent ? e.currentEvent.data : null);
-
-            // if mapping succeded then navigate to url
-            if (url) {
-                navigate(url);
-            }
-        }));
-
-        disposable.add(history.observe().subscribe(function (e) {
-            var url = e.hash;
-
-            if (currentUrl === url) { return; } //do not cause statechange if url is the same
-            currentUrl = url;
-
-            // needs a delay of 0 so that the transition is defined on the parent state
-            raise('routed', { url: url }, 0);
-        }));
+        return {
+            path: data[0],
+            parameters: has(data[1]) ? data[1].reduce(function (acc, x) {
+                var pair = x.split('=');
+                acc[pair[0]] = pair[1];
+                return acc;
+            }, {}) : undefined
+        };
     }
 
-    function disposeRouting() {
-        disposable.dispose();
-        //routerTransitions = [];
+    function convertHistoryEventToNavigatonEvent(evt) {
+        var url = evt.hash.replace(baseUrl, ''),
+            data = deserialize(url);
+
+        return merge(data, {
+            url: serialize(data),
+            timestamp: new Date().getTime()
+        });
     }
 
-    function route(routeDef) {
+    function removeBrackets(x) {
+        return is(x, 'string') ? x.replace('{', '').replace('}', '') : x;
+    }
+
+    function route(r) {
+        var data = deserialize(r);
+
+
         return $yield(function (s) {
             var transition;
+            routedStates[s.id] = data;
 
-            // add route for this state to router
-            router.addRoute(s.id, routeDef);
-            // create transition that would trigger on 'routed' event and will attempt to parse the url
             transition = on('routed', function (e) {
-                // if path of the 'routed' event matches the route then transition is active
-                var parsed = router.tryFromUrl(s.id, e.data.url);
-
-                if (parsed) {
-                    extend(e.data, parsed);
+                if (e.data.path[0] === data.path[0]) {
+                    data.path.slice(1).forEach(function (p, i) {
+                        e.data[removeBrackets(p)] = e.data.path[i + 1];
+                    });
+                    e.data = merge(e.data, e.data.parameters);
                     return true;
                 }
+                return false;
             }, gotoInternally(s.id));
 
-            // if router state is already added then register transition on that state
-            // otherwise add transition to the list of transitions to be registered once
-            // the router state gets registered
             if (routerStateId) {
                 registerTransition(routerStateId, transition);
             } else {
@@ -313,31 +161,86 @@ define('scalejs.routing-historyjs/routing',[
         });
     }
 
-    function routerState(stateId, optsOrBuilders) {
-        var builders,
-            builtRouterState;
+    function navigate(data) {
+        if (first) {
+            first = false;
+            history.replace({ url: serialize(data) });
+        } else {
+            history.add({ url: serialize(data) });
+        }
+    }
 
-        routerStateId = stateId;
+    function routerState(sid, optsOrBuilders) {
+        var disposable = new core.reactive.CompositeDisposable(),
+            router,
+            builders;
+
+        routerStateId = sid;
 
         if (has(optsOrBuilders, 'baseUrl')) {
-            router.setBaseUrl(optsOrBuilders.baseUrl);
+            baseUrl = optsOrBuilders.baseUrl;
             builders = toArray(arguments).slice(2, arguments.length);
         } else {
             builders = toArray(arguments).slice(1, arguments.length);
         }
 
-        builtRouterState = state.apply(null, [
-            routerStateId,
+        function subscribeRouter() {
+            var curr;
+
+            function isCurrent(url) {
+                return url === curr;
+            }
+
+            disposable.add(observeState().subscribe(function (e) {
+                var data;
+
+                if (has(routedStates, e.state) && e.event === 'entry') {
+                    data = routedStates[e.state];
+
+                    data.path = data.path.map(function (p) {
+                        var pkey = p.match(/[^{}]+(?=\})/);
+                        if (has(pkey)) {
+                            return e.currentEvent.data[pkey[0]];
+                        }
+                        return p;
+                    });
+
+                    if (has(data.parameters)) {
+                        Object.keys(data.parameters).forEach(function (p) {
+                            data.parameters[p] = e.currentEvent.data[removeBrackets(data.parameters[p])];
+                        });
+                    }
+
+                    navigate(data);
+                }
+            }));
+
+            disposable.add(observeHistory().subscribe(function (e) {
+                if (isCurrent(e.url)) { return; } //do not cause statechange if url is the same!
+                curr = e.url;
+
+                // needs a delay of 0 so that the transition is defined on the parent state
+                raise('routed', { path: e.path, parameters: e.parameters }, 0);
+            }));
+        }
+
+        router = state.apply(null, [
+            sid,
             on('router.disposing', gotoInternally('router.disposed')),
-            state('router.waiting', onEntry(setupRouting)),
-            state('router.disposed', onEntry(disposeRouting))
+            state('router.waiting', onEntry(subscribeRouter)),
+            state('router.disposed', onEntry(function () {
+                disposable.dispose();
+                routedStates = {};
+                routerTransitions = [];
+            }))
         ].concat(routerTransitions)
             .concat(builders));
 
-        return builtRouterState;
+        return router;
     }
 
     return {
+        //back: back,
         route: route,
         routerState: routerState
     };
